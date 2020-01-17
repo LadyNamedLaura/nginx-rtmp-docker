@@ -1,0 +1,42 @@
+load_module modules/ngx_rtmp_module.so;
+daemon off;
+
+events {
+    worker_connections  1024;
+}
+http {
+  server {
+    listen 6666;
+    error_log /var/log/nginx/debug.log debug;
+    location /pub_auth {
+      return 200;
+      if ($${_dummy_}arg_psk = '${RTMP_PUBLICATION_PSK}') {
+        return 200;
+      }
+      return 404;
+    }
+    location /play_auth {
+      if ($${_dummy_}arg_psk = '${RTMP_PLAYBACK_PSK}') {
+        return 200;
+      }
+      return 404;
+    }
+  }
+}
+rtmp {
+  server {
+    listen 1935;
+    ping 30s;
+    notify_method get;
+    application stream {
+      live on;
+      on_publish http://127.0.0.1:6666/pub_auth;
+      on_play http://127.0.0.1:6666/play_auth;
+      record all;
+      record_path '/srv/recordings';
+      record_unique on;
+      record_suffix _%d%m%Y_%H%M%S.flv;
+    }
+  }
+}
+
